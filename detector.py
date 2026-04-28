@@ -35,11 +35,11 @@ log_entries  = []
 
 # Per-IP behavioral tracker
 ip_tracker = defaultdict(lambda: {
-    "count":      0,
-    "ports":      set(),
-    "syn_count":  0,
-    "first_seen": None,
-    "alerted":    set(),
+    "count":        0,
+    "ports":        set(),
+    "first_seen":   None,
+    "alerted":      set(),
+    "pending_syns": {},   # (dst, dport) → timestamp; removed when ACK is seen
 })
 
 # AbuseIPDB cache — avoids querying the same IP twice
@@ -93,7 +93,7 @@ def _check_ports(packet, timestamp, src, dst):
 
 # ── Layer 2: Behavioral detection ────────────────
 
-def _check_behavior(src, timestamp, layer=None, proto=None):
+def _check_behavior(src, dst, timestamp, layer=None, proto=None):
     tracker = ip_tracker[src]
     now = datetime.datetime.now()
 
@@ -101,10 +101,15 @@ def _check_behavior(src, timestamp, layer=None, proto=None):
         tracker["first_seen"] = now
     tracker["count"] += 1
 
-    if layer is not None:
+    if layer is not None and proto == "TCP" and hasattr(layer, "flags"):
+        flags = int(layer.flags)
         tracker["ports"].add(layer.dport)
-        if proto == "TCP" and hasattr(layer, "flags") and layer.flags == 0x02:
-            tracker["syn_count"] += 1
+        if flags == 0x02:
+            # SYN only — record as pending, waiting for ACK
+            tracker["pending_syns"][(dst, layer.dport)] = now
+        elif flags & 0x10:
+            # ACK seen — handshake completed, remove from pending
+            tracker["pending_syns"].pop((dst, layer.dport), None)
 
     elapsed = (now - tracker["first_seen"]).total_seconds() or 1
 
@@ -116,8 +121,10 @@ def _check_behavior(src, timestamp, layer=None, proto=None):
         _alert(f"[{timestamp}] [HIGH] BEHAVIORAL: Port scan from {src} ({len(tracker['ports'])} ports in {elapsed:.1f}s)", "HIGH")
         tracker["alerted"].add("portscan")
 
-    if "synscan" not in tracker["alerted"] and tracker["syn_count"] > 15 and elapsed < 30:
-        _alert(f"[{timestamp}] [HIGH] BEHAVIORAL: SYN scan from {src} ({tracker['syn_count']} SYNs in {elapsed:.1f}s)", "HIGH")
+    # SYN scan: SYNs with no ACK reply after 2 seconds = incomplete handshakes
+    stale = sum(1 for t in tracker["pending_syns"].values() if (now - t).total_seconds() > 2)
+    if "synscan" not in tracker["alerted"] and stale > 15 and elapsed < 60:
+        _alert(f"[{timestamp}] [HIGH] BEHAVIORAL: SYN scan from {src} ({stale} unanswered SYNs in {elapsed:.1f}s)", "HIGH")
         tracker["alerted"].add("synscan")
 
 # ── Layer 3: Threat intelligence (AbuseIPDB) ─────
@@ -155,7 +162,7 @@ def check_packet(packet):
         src, dst = packet[IP].src, packet[IP].dst
         result = _check_ports(packet, timestamp, src, dst)
         layer, proto = result if result else (None, None)
-        _check_behavior(src, timestamp, layer, proto)
+        _check_behavior(src, dst, timestamp, layer, proto)
         _check_abuseipdb(src, timestamp)
 
     if packet_count % 50 == 0:
