@@ -130,8 +130,6 @@ def main():
         print(yellow("[!] Warning: not running as root. Packet capture may fail."))
         print(yellow(f"    → {ADMIN_HINT}\n"))
 
-    load_or_create_key()
-
     while True:
         print("\n--- MAIN MENU ---")
         print("  1. Start monitoring")
