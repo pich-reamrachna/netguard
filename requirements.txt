@@ -1,0 +1,4 @@
+scapy
+cryptography
+python-dotenv
+requests
