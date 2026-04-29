@@ -161,9 +161,11 @@ def _check_behavior(src, dst, timestamp, layer=None, proto=None):
         tracker["alerted"].add("portscan")
 
     # SYN scan: SYNs with no ACK reply after 2 seconds = incomplete handshakes
-    stale = sum(
-        1 for t in tracker["pending_syns"].values() if (now - t).total_seconds() > 2
-    )
+    stale = 0
+    for t in tracker["pending_syns"].values():
+        if (now - t).total_seconds() > 2:
+            stale += 1
+    
     if "synscan" not in tracker["alerted"] and stale > 15 and elapsed < 60:
         _alert(
             f"[{timestamp}] [HIGH] BEHAVIORAL: SYN scan from {src} ({stale} unanswered SYNs in {elapsed:.1f}s)",
