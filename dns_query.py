@@ -34,17 +34,12 @@ LOCAL_IP = get_local_ip()
 
 print("[*] NetGuard Traffic Simulator")
 print(f"[*] Local Wi-Fi IP : {LOCAL_IP}")
-print(f"[*] DNS target     : {DNS_SERVER}  (packets travel out through en0)")
-print("[*] Make sure netguard.py is running on en0!\n")
+print(f"[*] DNS target     : {DNS_SERVER}")
 time.sleep(1)
 
 tests = [
     ("Suspicious DNS query → xyz-malware.com", "dns", "xyz-malware.com"),
     ("Suspicious DNS query → botnet-c2-server.net", "dns", "botnet-c2-server.net"),
-    ("Suspicious TCP port 4444 (Metasploit)", "tcp", 4444),
-    ("Suspicious TCP port 1337 (backdoor)", "tcp", 1337),
-    ("Suspicious TCP port 6667 (IRC botnet)", "tcp", 6667),
-    ("Suspicious TCP port 31337 (elite hacker)", "tcp", 31337),
 ]
 
 for label, kind, value in tests:
