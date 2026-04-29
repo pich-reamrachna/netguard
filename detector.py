@@ -6,26 +6,8 @@ import requests
 from collections import defaultdict
 from scapy.all import IP, TCP, UDP, DNS, DNSQR
 from colors import red, yellow
+from rules import *
 
-# ── Detection rules ──────────────────────────────
-
-SUSPICIOUS_DOMAINS = re.compile(
-    r"(malware|botnet|phish|trojan|ransomware|exploit|payload|c2|cnc|rat\.|shell)",
-    re.IGNORECASE,
-)
-
-PRIVATE_IP = re.compile(
-    r"^(10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)$"
-)
-
-SUSPICIOUS_PORTS = {
-    4444: "Metasploit default",
-    1337: "Common backdoor port",
-    6667: "IRC (often used by botnets)",
-    31337: "Elite hacker port",
-    9001: "Tor relay port",
-    8080: "Alternate HTTP / proxy",
-}
 
 # ── Session state ────────────────────────────────
 
@@ -70,7 +52,21 @@ def _alert(msg, severity):
 
 # ── Layer 1: Rule-based detection ────────────────
 
+def is_suspicious_domain(domain: str) -> bool:
+    domain = domain.lower().strip(".")
+    labels = domain.split(".")
+    labels = [label for label in labels if label]
 
+    for label in labels:
+        if (label in SUSPICIOUS_LABELS):
+            return True
+        
+    for label in labels:
+        if (label.startswith(SUSPICIOUS_PREFIXES)):
+            return True
+        
+    return False
+    
 def _check_dns(packet, timestamp):
     if not (packet.haslayer(DNS) and packet.haslayer(DNSQR)):
         return
@@ -78,7 +74,7 @@ def _check_dns(packet, timestamp):
         domain = packet[DNSQR].qname.decode(errors="ignore").strip(".")
     except Exception:
         return
-    if domain and SUSPICIOUS_DOMAINS.search(domain):
+    if domain and is_suspicious_domain(domain):
         _alert(
             f"[{timestamp}] [MEDIUM] ALERT: Suspicious DNS query → {domain}", "MEDIUM"
         )
