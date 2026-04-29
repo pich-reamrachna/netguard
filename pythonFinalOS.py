@@ -10,6 +10,7 @@ import os
 import platform
 import datetime
 import ctypes
+import threading
 from dotenv import load_dotenv
 from scapy.all import sniff
 
@@ -71,18 +72,25 @@ def start_monitoring():
     print(cyan("\n[*] Starting NetGuard... Press Ctrl+C to stop.\n"))
     print("-" * 55)
 
+    stop_event = threading.Event()
+
     sniff_kwargs = {
         "prn": detector.check_packet,
         "count": count if count > 0 else 0,
         "store": False,
+        "stop_filter": lambda pkt: stop_event.is_set(),
     }
     if iface:
         sniff_kwargs["iface"] = iface
 
+    thread = threading.Thread(target=sniff, kwargs=sniff_kwargs, daemon=True)
     try:
-        sniff(**sniff_kwargs)
+        thread.start()
+        while thread.is_alive():
+            thread.join(timeout=0.5)
     except KeyboardInterrupt:
-        pass
+        stop_event.set()
+        thread.join(timeout=2)
     except Exception as e:
         print(red(f"\n[-] Error: {e}"))
         print(yellow(f"    Tip: {ADMIN_HINT}"))
