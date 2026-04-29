@@ -79,6 +79,11 @@ def _check_dns(packet, timestamp):
             f"[{timestamp}] [MEDIUM] ALERT: Suspicious DNS query → {domain}", "MEDIUM"
         )
 
+def _check_static_ip_list(ip, timestamp, direction):
+    if ip in SUSPICIOUS_IPS:
+        _alert(
+            f"[{timestamp}] [HIGH] ALERT: Suspicious {direction} IP detected -> {ip}", "HIGH"
+        )
 
 def _check_ports(packet, timestamp, src, dst):
     if not (packet.haslayer(TCP) or packet.haslayer(UDP)):
@@ -199,6 +204,8 @@ def check_packet(packet):
         result = _check_ports(packet, timestamp, src, dst)
         layer, proto = result if result else (None, None)
         _check_behavior(src, dst, timestamp, layer, proto)
+        _check_static_ip_list(src, timestamp, "source")
+        _check_static_ip_list(dst, timestamp, "destination")
         _check_abuseipdb(src, timestamp)
 
     if packet_count % 50 == 0:
