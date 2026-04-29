@@ -88,21 +88,31 @@ def _check_static_ip_list(ip, timestamp, direction):
 def _check_ports(packet, timestamp, src, dst):
     if not (packet.haslayer(TCP) or packet.haslayer(UDP)):
         return
-    layer = packet[TCP] if packet.haslayer(TCP) else packet[UDP]
-    proto = "TCP" if packet.haslayer(TCP) else "UDP"
+    if packet.haslayer(TCP):
+        layer = packet[TCP]
+        proto = "TCP"
+    else:
+        layer = packet[UDP]
+        proto = "UDP"
+
     both_private = bool(PRIVATE_IP.match(src) and PRIVATE_IP.match(dst))
 
     for port, reason in SUSPICIOUS_PORTS.items():
         if layer.dport == port:
-            label = "Lateral movement" if both_private else f"Suspicious {proto} port"
-            tag = "" if both_private else " [INBOUND]"
-            _alert(
-                f"[{timestamp}] [HIGH] ALERT: {label} on {proto} port {port} ({reason}){tag} | {src} → {dst}",
-                "HIGH",
-            )
+            if both_private:
+                _alert(
+                    f"[{timestamp}] [HIGH] ALERT: Possible lateral movement on {proto} port {port} ({reason}) | {src} -> {dst}",
+                    "HIGH",
+                )
+            else:
+                _alert(
+                    f"[{timestamp}] [HIGH] ALERT: Suspicious {proto} port {port} ({reason}) [TO SUSPICIOUS PORT] | {src} -> {dst}",
+                    "HIGH",
+                )
+
         elif layer.sport == port:
             _alert(
-                f"[{timestamp}] [LOW] ALERT: Suspicious {proto} port {port} ({reason}) [OUTBOUND RESPONSE] | {src} → {dst}",
+                f"[{timestamp}] [LOW] ALERT: Suspicious {proto} port {port} ({reason}) [FROM SUSPICIOUS PORT] | {src} -> {dst}",
                 "LOW",
             )
 
