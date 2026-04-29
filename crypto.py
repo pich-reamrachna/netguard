@@ -5,6 +5,7 @@ from colors import green, yellow
 KEY_FILE = os.getenv("KEY_FILE", "netguard.key")
 LOG_FILE = os.getenv("LOG_FILE", "netguard_log.enc")
 
+
 def load_or_create_key():
     if os.path.exists(KEY_FILE):
         with open(KEY_FILE, "rb") as f:
@@ -14,6 +15,7 @@ def load_or_create_key():
         f.write(key)
     print(green(f"[+] New encryption key generated and saved to '{KEY_FILE}'"))
     return key
+
 
 def encrypt_and_save(log_entries, key):
     fernet = Fernet(key)
@@ -30,6 +32,7 @@ def encrypt_and_save(log_entries, key):
         f.write(fernet.encrypt(combined.encode()))
     print(green(f"[+] Session appended and saved to '{LOG_FILE}'"))
 
+
 def decrypt_and_show(key):
     if not os.path.exists(LOG_FILE):
         print(yellow("[-] No log file found. Run a monitoring session first."))
@@ -37,8 +40,8 @@ def decrypt_and_show(key):
     fernet = Fernet(key)
     with open(LOG_FILE, "rb") as f:
         decrypted = fernet.decrypt(f.read()).decode()
-    print("\n" + "="*55)
+    print("\n" + "=" * 55)
     print("         DECRYPTED LOG FILE CONTENTS")
-    print("="*55)
+    print("=" * 55)
     print(decrypted)
-    print("="*55 + "\n")
+    print("=" * 55 + "\n")

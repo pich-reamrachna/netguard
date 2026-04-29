@@ -23,12 +23,13 @@ import detector
 IS_WINDOWS = platform.system() == "Windows"
 ADMIN_HINT = (
     "Run this script as Administrator (right-click → Run as administrator)."
-    if IS_WINDOWS else
-    "Run this script with sudo: sudo python3 netguard.py"
+    if IS_WINDOWS
+    else "Run this script with sudo: sudo python3 netguard.py"
 )
 
 
 # ── Monitoring session ───────────────────────────
+
 
 def _pick_interface(pairs, auto_display, auto_scapy):
     iface_input = input(
@@ -48,6 +49,7 @@ def _pick_interface(pairs, auto_display, auto_scapy):
     print(green(f"[+] Using: {iface_input}"))
     return iface_input
 
+
 def start_monitoring():
     detector.reset_state()
 
@@ -58,7 +60,9 @@ def start_monitoring():
 
     iface = _pick_interface(pairs, auto_display, auto_scapy)
 
-    count_input = input("[?] How many packets to capture? (0 = unlimited, Ctrl+C to stop): ").strip()
+    count_input = input(
+        "[?] How many packets to capture? (0 = unlimited, Ctrl+C to stop): "
+    ).strip()
     try:
         count = int(count_input)
     except ValueError:
@@ -67,7 +71,11 @@ def start_monitoring():
     print(cyan("\n[*] Starting NetGuard... Press Ctrl+C to stop.\n"))
     print("-" * 55)
 
-    sniff_kwargs = {"prn": detector.check_packet, "count": count if count > 0 else 0, "store": False}
+    sniff_kwargs = {
+        "prn": detector.check_packet,
+        "count": count if count > 0 else 0,
+        "store": False,
+    }
     if iface:
         sniff_kwargs["iface"] = iface
 
@@ -80,19 +88,25 @@ def start_monitoring():
         print(yellow(f"    Tip: {ADMIN_HINT}"))
         print(yellow("    Also check that the interface name is correct."))
         if IS_WINDOWS:
-            print(yellow("    Windows users: make sure Npcap is installed → https://npcap.com"))
+            print(
+                yellow(
+                    "    Windows users: make sure Npcap is installed → https://npcap.com"
+                )
+            )
         return
 
-    print("\n\n" + "="*55)
+    print("\n\n" + "=" * 55)
     print("              SESSION SUMMARY")
-    print("="*55)
+    print("=" * 55)
     print(f"  Total packets captured : {detector.packet_count}")
     print(f"  Total alerts generated : {detector.alert_count}")
-    print("="*55)
+    print("=" * 55)
 
     if detector.log_entries:
         key = load_or_create_key()
-        detector.log_entries.insert(0, f"=== NetGuard Session | {datetime.datetime.now()} ===")
+        detector.log_entries.insert(
+            0, f"=== NetGuard Session | {datetime.datetime.now()} ==="
+        )
         encrypt_and_save(detector.log_entries, key)
     else:
         print(green("[+] No suspicious activity detected. No log saved."))
@@ -100,12 +114,14 @@ def start_monitoring():
 
 # ── View log ─────────────────────────────────────
 
+
 def view_log():
     key = load_or_create_key()
     decrypt_and_show(key)
 
 
 # ── Main ─────────────────────────────────────────
+
 
 def main():
     print("""
@@ -122,7 +138,11 @@ def main():
     if IS_WINDOWS:
         try:
             if not ctypes.windll.shell32.IsUserAnAdmin():
-                print(yellow("[!] Warning: not running as Administrator. Packet capture may fail."))
+                print(
+                    yellow(
+                        "[!] Warning: not running as Administrator. Packet capture may fail."
+                    )
+                )
                 print(yellow(f"    → {ADMIN_HINT}\n"))
         except Exception:
             pass
@@ -146,6 +166,7 @@ def main():
             break
         else:
             print(yellow("[-] Invalid option. Please enter 1, 2, or 3."))
+
 
 if __name__ == "__main__":
     main()

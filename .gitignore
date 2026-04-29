@@ -1,3 +1,6 @@
 .env
 *.key
 *.enc
+.venv/
+*.pyc
+__pycache__/

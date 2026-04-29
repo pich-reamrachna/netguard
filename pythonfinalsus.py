@@ -13,7 +13,8 @@ from scapy.all import send, IP, TCP, UDP, DNS, DNSQR
 # DNS packets go OUT to 8.8.8.8 — this forces them through en0
 # NetGuard sniffs them as they leave your machine
 DNS_SERVER = "8.8.8.8"
-HOST_IP    = "192.168.56.1"   # VirtualBox host-only adapter IP on the host machine
+HOST_IP = "192.168.56.1"  # VirtualBox host-only adapter IP on the host machine
+
 
 def get_local_ip():
     """Resolve the local Wi-Fi IP."""
@@ -22,11 +23,12 @@ def get_local_ip():
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
         s.close()
-        print('ip')
+        print("ip")
         return ip
-        
+
     except Exception:
         return "192.168.1.100"
+
 
 LOCAL_IP = get_local_ip()
 
@@ -37,12 +39,12 @@ print("[*] Make sure netguard.py is running on en0!\n")
 time.sleep(1)
 
 tests = [
-    ("Suspicious DNS query → xyz-malware.com",      "dns", "xyz-malware.com"),
-    ("Suspicious DNS query → botnet-c2-server.net",  "dns", "botnet-c2-server.net"),
-    ("Suspicious TCP port 4444 (Metasploit)",        "tcp", 4444),
-    ("Suspicious TCP port 1337 (backdoor)",          "tcp", 1337),
-    ("Suspicious TCP port 6667 (IRC botnet)",        "tcp", 6667),
-    ("Suspicious TCP port 31337 (elite hacker)",     "tcp", 31337),
+    ("Suspicious DNS query → xyz-malware.com", "dns", "xyz-malware.com"),
+    ("Suspicious DNS query → botnet-c2-server.net", "dns", "botnet-c2-server.net"),
+    ("Suspicious TCP port 4444 (Metasploit)", "tcp", 4444),
+    ("Suspicious TCP port 1337 (backdoor)", "tcp", 1337),
+    ("Suspicious TCP port 6667 (IRC botnet)", "tcp", 6667),
+    ("Suspicious TCP port 31337 (elite hacker)", "tcp", 31337),
 ]
 
 for label, kind, value in tests:
@@ -50,7 +52,11 @@ for label, kind, value in tests:
 
     if kind == "dns":
         # Outbound DNS query → goes through en0, NetGuard catches it
-        pkt = IP(src=LOCAL_IP, dst=DNS_SERVER) / UDP(dport=53) / DNS(rd=1, qd=DNSQR(qname=value))
+        pkt = (
+            IP(src=LOCAL_IP, dst=DNS_SERVER)
+            / UDP(dport=53)
+            / DNS(rd=1, qd=DNSQR(qname=value))
+        )
         send(pkt, verbose=False)
 
     elif kind == "tcp":

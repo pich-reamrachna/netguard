@@ -11,7 +11,7 @@ from colors import red, yellow
 
 SUSPICIOUS_DOMAINS = re.compile(
     r"(malware|botnet|phish|trojan|ransomware|exploit|payload|c2|cnc|rat\.|shell)",
-    re.IGNORECASE
+    re.IGNORECASE,
 )
 
 PRIVATE_IP = re.compile(
@@ -19,42 +19,47 @@ PRIVATE_IP = re.compile(
 )
 
 SUSPICIOUS_PORTS = {
-    4444:  "Metasploit default",
-    1337:  "Common backdoor port",
-    6667:  "IRC (often used by botnets)",
+    4444: "Metasploit default",
+    1337: "Common backdoor port",
+    6667: "IRC (often used by botnets)",
     31337: "Elite hacker port",
-    9001:  "Tor relay port",
-    8080:  "Alternate HTTP / proxy",
+    9001: "Tor relay port",
+    8080: "Alternate HTTP / proxy",
 }
 
 # ── Session state ────────────────────────────────
 
 packet_count = 0
-alert_count  = 0
-log_entries  = []
+alert_count = 0
+log_entries = []
 
 # Per-IP behavioral tracker
-ip_tracker = defaultdict(lambda: {
-    "count":        0,
-    "ports":        set(),
-    "first_seen":   None,
-    "alerted":      set(),
-    "pending_syns": {},   # (dst, dport) → timestamp; removed when ACK is seen
-})
+ip_tracker = defaultdict(
+    lambda: {
+        "count": 0,
+        "ports": set(),
+        "first_seen": None,
+        "alerted": set(),
+        "pending_syns": {},  # (dst, dport) → timestamp; removed when ACK is seen
+    }
+)
 
 # AbuseIPDB cache — avoids querying the same IP twice
 _abuse_cache = {}
 ABUSEIPDB_KEY = os.getenv("ABUSEIPDB_API_KEY", "")
 
+
 def reset_state():
     global packet_count, alert_count, log_entries
     packet_count = 0
-    alert_count  = 0
-    log_entries  = []
+    alert_count = 0
+    log_entries = []
     ip_tracker.clear()
     _abuse_cache.clear()
 
+
 # ── Alert helper ─────────────────────────────────
+
 
 def _alert(msg, severity):
     global alert_count
@@ -62,7 +67,9 @@ def _alert(msg, severity):
     log_entries.append(msg)
     alert_count += 1
 
+
 # ── Layer 1: Rule-based detection ────────────────
+
 
 def _check_dns(packet, timestamp):
     if not (packet.haslayer(DNS) and packet.haslayer(DNSQR)):
@@ -72,7 +79,10 @@ def _check_dns(packet, timestamp):
     except Exception:
         return
     if domain and SUSPICIOUS_DOMAINS.search(domain):
-        _alert(f"[{timestamp}] [MEDIUM] ALERT: Suspicious DNS query → {domain}", "MEDIUM")
+        _alert(
+            f"[{timestamp}] [MEDIUM] ALERT: Suspicious DNS query → {domain}", "MEDIUM"
+        )
+
 
 def _check_ports(packet, timestamp, src, dst):
     if not (packet.haslayer(TCP) or packet.haslayer(UDP)):
@@ -84,14 +94,22 @@ def _check_ports(packet, timestamp, src, dst):
     for port, reason in SUSPICIOUS_PORTS.items():
         if layer.dport == port:
             label = "Lateral movement" if both_private else f"Suspicious {proto} port"
-            tag   = "" if both_private else " [INBOUND]"
-            _alert(f"[{timestamp}] [HIGH] ALERT: {label} on {proto} port {port} ({reason}){tag} | {src} → {dst}", "HIGH")
+            tag = "" if both_private else " [INBOUND]"
+            _alert(
+                f"[{timestamp}] [HIGH] ALERT: {label} on {proto} port {port} ({reason}){tag} | {src} → {dst}",
+                "HIGH",
+            )
         elif layer.sport == port:
-            _alert(f"[{timestamp}] [LOW] ALERT: Suspicious {proto} port {port} ({reason}) [OUTBOUND RESPONSE] | {src} → {dst}", "LOW")
+            _alert(
+                f"[{timestamp}] [LOW] ALERT: Suspicious {proto} port {port} ({reason}) [OUTBOUND RESPONSE] | {src} → {dst}",
+                "LOW",
+            )
 
     return layer, proto
 
+
 # ── Layer 2: Behavioral detection ────────────────
+
 
 def _check_behavior(src, dst, timestamp, layer=None, proto=None):
     tracker = ip_tracker[src]
@@ -114,20 +132,37 @@ def _check_behavior(src, dst, timestamp, layer=None, proto=None):
     elapsed = (now - tracker["first_seen"]).total_seconds() or 1
 
     if "flood" not in tracker["alerted"] and tracker["count"] > 100 and elapsed < 5:
-        _alert(f"[{timestamp}] [HIGH] BEHAVIORAL: Flood from {src} ({tracker['count']} packets in {elapsed:.1f}s)", "HIGH")
+        _alert(
+            f"[{timestamp}] [HIGH] BEHAVIORAL: Flood from {src} ({tracker['count']} packets in {elapsed:.1f}s)",
+            "HIGH",
+        )
         tracker["alerted"].add("flood")
 
-    if "portscan" not in tracker["alerted"] and len(tracker["ports"]) > 10 and elapsed < 60:
-        _alert(f"[{timestamp}] [HIGH] BEHAVIORAL: Port scan from {src} ({len(tracker['ports'])} ports in {elapsed:.1f}s)", "HIGH")
+    if (
+        "portscan" not in tracker["alerted"]
+        and len(tracker["ports"]) > 10
+        and elapsed < 60
+    ):
+        _alert(
+            f"[{timestamp}] [HIGH] BEHAVIORAL: Port scan from {src} ({len(tracker['ports'])} ports in {elapsed:.1f}s)",
+            "HIGH",
+        )
         tracker["alerted"].add("portscan")
 
     # SYN scan: SYNs with no ACK reply after 2 seconds = incomplete handshakes
-    stale = sum(1 for t in tracker["pending_syns"].values() if (now - t).total_seconds() > 2)
+    stale = sum(
+        1 for t in tracker["pending_syns"].values() if (now - t).total_seconds() > 2
+    )
     if "synscan" not in tracker["alerted"] and stale > 15 and elapsed < 60:
-        _alert(f"[{timestamp}] [HIGH] BEHAVIORAL: SYN scan from {src} ({stale} unanswered SYNs in {elapsed:.1f}s)", "HIGH")
+        _alert(
+            f"[{timestamp}] [HIGH] BEHAVIORAL: SYN scan from {src} ({stale} unanswered SYNs in {elapsed:.1f}s)",
+            "HIGH",
+        )
         tracker["alerted"].add("synscan")
 
+
 # ── Layer 3: Threat intelligence (AbuseIPDB) ─────
+
 
 def _check_abuseipdb(ip, timestamp):
     if not ABUSEIPDB_KEY or PRIVATE_IP.match(ip):
@@ -147,9 +182,14 @@ def _check_abuseipdb(ip, timestamp):
         except Exception:
             return
     if score > 50:
-        _alert(f"[{timestamp}] [HIGH] THREAT INTEL: Known malicious IP {ip} (AbuseIPDB score: {score}/100)", "HIGH")
+        _alert(
+            f"[{timestamp}] [HIGH] THREAT INTEL: Known malicious IP {ip} (AbuseIPDB score: {score}/100)",
+            "HIGH",
+        )
+
 
 # ── Packet entry point ───────────────────────────
+
 
 def check_packet(packet):
     global packet_count
@@ -166,5 +206,7 @@ def check_packet(packet):
         _check_abuseipdb(src, timestamp)
 
     if packet_count % 50 == 0:
-        sys.stdout.write(f"  ... {packet_count} packets captured, {alert_count} alerts so far\r")
+        sys.stdout.write(
+            f"  ... {packet_count} packets captured, {alert_count} alerts so far\r"
+        )
         sys.stdout.flush()

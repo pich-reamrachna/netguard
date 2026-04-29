@@ -5,12 +5,14 @@ from colors import cyan, green
 
 IS_WINDOWS = platform.system() == "Windows"
 
+
 def get_friendly_interfaces():
     raw = get_if_list()
     if not IS_WINDOWS:
         return [(r, r) for r in raw]
     try:
         from scapy.arch.windows import get_windows_if_list
+
         win_ifaces = {i["guid"]: i["name"] for i in get_windows_if_list()}
         pairs = []
         for r in raw:
@@ -21,12 +23,14 @@ def get_friendly_interfaces():
     except Exception:
         return [(r, r) for r in raw]
 
+
 def list_interfaces():
     pairs = get_friendly_interfaces()
     print(cyan("\n[*] Available network interfaces:"))
     for i, (display, _) in enumerate(pairs):
         print(f"    {i+1}. {display}")
     return pairs
+
 
 def auto_select_interface(pairs):
     priority = [
