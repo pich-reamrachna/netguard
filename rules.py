@@ -3,7 +3,7 @@ import re
 
 SUSPICIOUS_DOMAIN_RE = re.compile(
     r'\b(?:malware|botnet|phish|trojan|ransomware|exploit|payload|c2|cnc|shell)\b'
-    r'|\brat',   # no trailing \b — preserves prefix match for "rat*" domains
+    r'|\brat',
     re.IGNORECASE
 )
 
