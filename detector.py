@@ -6,7 +6,7 @@ import requests
 from collections import defaultdict
 from scapy.all import IP, TCP, UDP, DNS, DNSQR
 from colors import red, yellow
-from rules import *
+from rules import SUSPICIOUS_DOMAIN_RE, SUSPICIOUS_PORTS, SUSPICIOUS_IPS, PRIVATE_IP
 
 
 # ── Session state ────────────────────────────────
@@ -53,19 +53,7 @@ def _alert(msg, severity):
 # ── Layer 1: Rule-based detection ────────────────
 
 def is_suspicious_domain(domain: str) -> bool:
-    domain = domain.lower().strip(".")
-    labels = domain.split(".")
-    labels = [label for label in labels if label]
-
-    for label in labels:
-        if (label in SUSPICIOUS_LABELS):
-            return True
-        
-    for label in labels:
-        if (label.startswith(SUSPICIOUS_PREFIXES)):
-            return True
-        
-    return False
+    return bool(SUSPICIOUS_DOMAIN_RE.search(domain.lower().strip(".")))
     
 def _check_dns(packet, timestamp):
     if not (packet.haslayer(DNS) and packet.haslayer(DNSQR)):
