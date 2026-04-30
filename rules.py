@@ -7,7 +7,6 @@ SUSPICIOUS_DOMAIN_RE = re.compile(
     re.IGNORECASE
 )
 
-
 SUSPICIOUS_PORTS = {
     4444: "Metasploit default",
     1337: "Common backdoor port",
